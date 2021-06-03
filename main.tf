@@ -288,6 +288,18 @@ resource "aws_instance" "wordpress" {
   }
 }
 
+# We create an elastic IP for our wordpress server
+# A static public IP address that we can assign to our bastion host
+resource "aws_eip" "wordpress_elastic_ip" {
+   vpc = true
+}
+
+# We associate the elastic ip to our wordpress server
+resource "aws_eip_association" "wordpress_eip_association" {
+  instance_id   = aws_instance.wordpress.id
+  allocation_id = aws_eip.wordpress_elastic_ip.id
+}
+
 # We create a security group for our mysql instance
 resource "aws_security_group" "sg_mysql" {
   depends_on = [
@@ -337,4 +349,16 @@ resource "aws_instance" "mysql" {
   tags = {
       Name = "mysql-instance"
   }
+}
+
+# We save our wordpress and bastion host public ip in a file.
+resource "local_file" "ip_addresses" {
+  content = <<EOF
+            Wordpress public ip address: ${aws_eip.wordpress_elastic_ip.public_ip}
+            Wordpress private ip address: ${aws_instance.wordpress.private_ip}
+            Bastion host public ip address: ${aws_eip.bastion_elastic_ip.public_ip}
+            Bastion host private ip address: ${aws_instance.bastion_host.private_ip}
+            Mysql private ip address: ${aws_instance.mysql.private_ip}
+  EOF
+  filename = "${var.key_path}ip_addresses.txt"
 }
