@@ -227,3 +227,114 @@ resource "aws_eip_association" "bastion_eip_association" {
   instance_id   = aws_instance.bastion_host.id
   allocation_id = aws_eip.bastion_elastic_ip.id
 }
+
+# We create a security group for our wordpress instance
+resource "aws_security_group" "sg_wordpress" {
+  depends_on = [
+    aws_vpc.vpc,
+  ]
+
+  name        = "sg wordpress"
+  description = "Allow http inbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description = "allow TCP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    description = "allow SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${aws_eip.bastion_elastic_ip.public_ip}/32"] 
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# We create our wordpress instance in public subnet
+resource "aws_instance" "wordpress" {
+  depends_on = [
+    aws_security_group.sg_wordpress,
+    aws_instance.mysql
+  ]
+  ami = "ami-077e31c4939f6a2f3"
+  instance_type = "t2.micro"
+  key_name = aws_key_pair.public_ssh_key.key_name
+  vpc_security_group_ids = [aws_security_group.sg_wordpress.id]
+  subnet_id = aws_subnet.public_subnet.id
+  user_data = <<EOF
+            #! /bin/bash
+            yum update
+            yum install docker -y
+            systemctl restart docker
+            systemctl enable docker
+            docker pull wordpress
+            docker run --name wordpress -p 80:80 -e WORDPRESS_DB_HOST=${aws_instance.mysql.private_ip} \
+            -e WORDPRESS_DB_USER=root -e WORDPRESS_DB_PASSWORD=root -e WORDPRESS_DB_NAME=wordpressdb -d wordpress
+  EOF
+
+  tags = {
+      Name = "wordpress"
+  }
+}
+
+# We create a security group for our mysql instance
+resource "aws_security_group" "sg_mysql" {
+  depends_on = [
+    aws_vpc.vpc,
+  ]
+  name        = "sg mysql"
+  description = "Allow mysql inbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description = "allow TCP"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    security_groups = [aws_security_group.sg_wordpress.id]
+  }
+
+  ingress {
+    description = "allow SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${aws_eip.bastion_elastic_ip.public_ip}/32"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# We create our mysql instance in the private subnet
+resource "aws_instance" "mysql" {
+  depends_on = [
+    aws_security_group.sg_mysql,
+    aws_nat_gateway.nat_gateway,
+    aws_route_table_association.associate_routetable_to_private_subnet,
+  ]
+  ami = "ami-077e31c4939f6a2f3"
+  instance_type = "t2.micro"
+  key_name = aws_key_pair.public_ssh_key.key_name
+  vpc_security_group_ids = [aws_security_group.sg_mysql.id]
+  subnet_id = aws_subnet.private_subnet.id
+  user_data = file("configure_mysql.sh")
+  tags = {
+      Name = "mysql-instance"
+  }
+}
