@@ -35,11 +35,37 @@ pipeline {
             }
         }
     }
+    stage("TerraformSelect") {
+       steps {
+           script {
+                env.RELEASE_SCOPE = input message: 'User input required', ok: 'Release!',
+                parameters: [choice(name: 'RELEASE_SCOPE', choices: 'apply\destroy\nothing', description: 'What is the release scope?')]
+           }
+           echo "${env.RELEASE_SCOPE}"
+       }
+    }
     stage('TerraformApply'){
+        when {
+          expression {
+            return env.RELEASE_SCOPE == 'apply';
+          }
+        }
         steps {
             script{                    
                 unstash "terraform-plan"
                 sh "terraform apply terraform.tfplan"
+            }
+        }
+    }
+    stage('TerraformDestroy'){
+        when {
+          expression {
+            return env.RELEASE_SCOPE == 'destroy';
+          }
+        }
+        steps {
+            script{
+                sh "terraform destroy -auto-approve -var 'access_key=$ACCESS_KEY' -var 'secret_key=$SECRET_KEY' "
             }
         }
     }
