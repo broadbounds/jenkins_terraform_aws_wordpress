@@ -39,7 +39,7 @@ pipeline {
        steps {
            script {
                 env.RELEASE_SCOPE = input message: 'User input required', ok: 'Release!',
-                parameters: [choice(name: 'RELEASE_SCOPE', choices: 'apply\\destroy\\nothing', description: 'What is the release scope?')]
+                parameters: [choice(name: 'RELEASE_SCOPE', choices: 'apply\ndestroy\nnothing', description: 'What is the release scope?')]
            }
            echo "${env.RELEASE_SCOPE}"
        }
