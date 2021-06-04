@@ -77,7 +77,7 @@ pipeline {
         }
         steps {
             script{
-                sh "terraform destroy -auto-approve -var 'access_key=$ACCESS_KEY' -var 'secret_key=$SECRET_KEY' "
+                echo "terraform did nothing to the infrastructure"
             }
         }
     }
