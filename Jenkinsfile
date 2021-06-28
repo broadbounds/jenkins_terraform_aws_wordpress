@@ -9,6 +9,11 @@ pipeline {
     PATH = "$TF_HOME:$PATH"
     ACCESS_KEY = credentials('AWS_ACCESS_KEY_ID')
     SECRET_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    cloudmapper_access_key = credentials('cloudmapper_access_key')
+    cloudmapper_secret_key = credentials('cloudmapper_secret_key')
+    aws_account_name = credentials('aws_account_name')
+    aws_account_id = credentials('aws_account_id')    
+    region = credentials('region')   
   }
   stages {
     stage('TerraformInit'){
